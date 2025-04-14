@@ -1,0 +1,127 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+from datetime import datetime
+import os
+
+# ---------- CONFIGURACIÓN ----------
+nombre_usuario = "giovani"
+ruta_imagen = r'C:/Users/giovani/Desktop/futurama.jpg'
+fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+marca = f"{nombre_usuario} - {fecha_hora}"
+
+# Crear carpeta de salida si no existe
+carpeta_salida = "salidas"
+os.makedirs(carpeta_salida, exist_ok=True)
+
+# Función para agregar marca de agua
+def agregar_marca_agua(img, texto):
+    imagen_copia = img.copy()
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    posicion = (10, imagen_copia.shape[0] - 10)
+    cv2.putText(imagen_copia, texto, posicion, font, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
+    return imagen_copia
+
+# Función para guardar imagen
+def guardar(nombre_archivo, imagen):
+    cv2.imwrite(os.path.join(carpeta_salida, nombre_archivo), imagen)
+
+# Cargar imagen
+imagen = cv2.imread(ruta_imagen)
+if imagen is None:
+    print(f"No se pudo cargar la imagen desde: {ruta_imagen}")
+    exit()
+
+# Imagen original con marca de agua
+imagen_original = agregar_marca_agua(imagen, marca)
+cv2.imshow('Imagen Original', imagen_original)
+guardar("01_original.jpg", imagen_original)
+
+# ---------- Histograma ----------
+imagen_gris = cv2.cvtColor(imagen_original, cv2.COLOR_BGR2GRAY)
+plt.hist(imagen_gris.ravel(), 256, [0, 256])
+plt.title("Histograma de la Imagen")
+plt.xlabel("Intensidad de color")
+plt.ylabel("Frecuencia")
+plt.savefig(os.path.join(carpeta_salida, "02_histograma.png"))
+plt.show()
+
+# ---------- Espejo ----------
+imagen_espejo = agregar_marca_agua(cv2.flip(imagen, 1), marca)
+cv2.imshow('Imagen Espejo', imagen_espejo)
+guardar("03_espejo.jpg", imagen_espejo)
+
+# ---------- Rotaciones ----------
+imagen_rot90 = agregar_marca_agua(cv2.rotate(imagen, cv2.ROTATE_90_CLOCKWISE), marca)
+cv2.imshow('Rotación 90°', imagen_rot90)
+guardar("04_rotacion_90.jpg", imagen_rot90)
+
+imagen_rot180 = agregar_marca_agua(cv2.rotate(imagen, cv2.ROTATE_180), marca)
+cv2.imshow('Rotación 180°', imagen_rot180)
+guardar("05_rotacion_180.jpg", imagen_rot180)
+
+imagen_rot270 = agregar_marca_agua(cv2.rotate(imagen, cv2.ROTATE_90_COUNTERCLOCKWISE), marca)
+cv2.imshow('Rotación 270°', imagen_rot270)
+guardar("06_rotacion_270.jpg", imagen_rot270)
+
+# ---------- Negativo ----------
+imagen_negativo = agregar_marca_agua(cv2.bitwise_not(imagen), marca)
+cv2.imshow('Imagen Negativo', imagen_negativo)
+guardar("07_negativo.jpg", imagen_negativo)
+
+# ---------- Contraste ----------
+imagen_contraste = agregar_marca_agua(
+    cv2.convertScaleAbs(imagen, alpha=1.5, beta=0), marca)
+cv2.imshow('Imagen con Contraste', imagen_contraste)
+guardar("08_contraste.jpg", imagen_contraste)
+
+# ---------- CMYK (aproximado) ----------
+imagen_rgb = cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB)
+imagen_cmyk = np.zeros_like(imagen_rgb)
+imagen_cmyk[:, :, 0] = 255 - imagen_rgb[:, :, 0]  # C
+imagen_cmyk[:, :, 1] = 255 - imagen_rgb[:, :, 1]  # M
+imagen_cmyk[:, :, 2] = 255 - imagen_rgb[:, :, 2]  # Y
+imagen_cmyk_marca = agregar_marca_agua(imagen_cmyk, marca)
+cv2.imshow('CMYK Aproximado', imagen_cmyk_marca)
+guardar("09_cmyk_aprox.jpg", cv2.cvtColor(imagen_cmyk_marca, cv2.COLOR_RGB2BGR))
+
+# ---------- COLLAGE + HISTOGRAMA ----------
+
+def redimensionar(img, ancho=200):
+    alto = int(img.shape[0] * (ancho / img.shape[1]))
+    return cv2.resize(img, (ancho, alto))
+
+imagenes_para_collage = [
+    ('Original', redimensionar(cv2.cvtColor(imagen_original, cv2.COLOR_BGR2RGB))),
+    ('Espejo', redimensionar(cv2.cvtColor(imagen_espejo, cv2.COLOR_BGR2RGB))),
+    ('Rotación 90°', redimensionar(cv2.cvtColor(imagen_rot90, cv2.COLOR_BGR2RGB))),
+    ('Rotación 180°', redimensionar(cv2.cvtColor(imagen_rot180, cv2.COLOR_BGR2RGB))),
+    ('Rotación 270°', redimensionar(cv2.cvtColor(imagen_rot270, cv2.COLOR_BGR2RGB))),
+    ('Negativo', redimensionar(cv2.cvtColor(imagen_negativo, cv2.COLOR_BGR2RGB))),
+    ('Contraste', redimensionar(cv2.cvtColor(imagen_contraste, cv2.COLOR_BGR2RGB))),
+    ('CMYK aprox', redimensionar(imagen_cmyk_marca)),
+]
+
+fig, axs = plt.subplots(3, 3, figsize=(12, 10))
+fig.suptitle(f"Procesamiento de imagen - {nombre_usuario} ({fecha_hora})", fontsize=12)
+
+for i, (titulo, img) in enumerate(imagenes_para_collage):
+    fila = i // 3
+    col = i % 3
+    axs[fila, col].imshow(img)
+    axs[fila, col].set_title(titulo)
+    axs[fila, col].axis('off')
+
+axs[2, 2].hist(imagen_gris.ravel(), 256, [0, 256], color='gray')
+axs[2, 2].set_title("Histograma")
+axs[2, 2].set_xlabel("Intensidad")
+axs[2, 2].set_ylabel("Frecuencia")
+axs[2, 2].grid(True)
+
+plt.tight_layout()
+plt.subplots_adjust(top=0.90)
+plt.savefig(os.path.join(carpeta_salida, "10_collage.png"))
+plt.show()
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
